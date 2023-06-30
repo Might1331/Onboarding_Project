@@ -1,0 +1,84 @@
+define
+
+#The database for next best restaurant app
+#entities
+menu sub entity,
+    owns place,
+    owns name,
+    owns avg_rating,
+    owns call_number,
+    owns is_vegetarian,
+    plays sells:seller,
+    plays speciality:restaurant;
+
+dish sub entity,
+    owns name,
+    owns is_vegetarian,
+    plays sells:product,
+    plays is_ingredient:dish,
+    plays speciality:dish;
+
+raw_food sub entity,
+    owns name,
+    owns is_vegetarian,
+    plays is_ingredient:raw_food;
+
+
+#relations
+sells sub relation,
+    relates seller,
+    relates product,
+    owns price;
+
+is_ingredient sub relation,
+    relates raw_food,
+    relates dish;
+
+speciality sub relation,
+    relates restaurant,
+    relates dish;
+
+#rules
+rule is_not_vegetarian_dish:
+when{
+    $r isa raw_food, has is_vegetarian false;
+    $d isa dish;
+    (dish: $d,$r) isa is_ingredient;
+}then{
+    $d has is_vegetarian false;
+};
+
+rule is_not_vegetarian_menu:
+when{
+    $d isa dish, has is_vegetarian false;
+    $m isa menu;
+    (seller: $m, $d) isa sells;
+}then{
+    $m has is_vegetarian false;
+};
+
+rule if_speciality_then_sells:
+when{
+    $d isa dish;
+    $m isa menu;
+    (dish: $d,$m) isa speciality;
+}then{
+    (seller: $m,product: $d) isa sells;
+};
+
+
+#attributes
+name sub attribute,
+    value string;
+place sub attribute,
+    value string;
+business_type sub attribute,
+    value string;
+avg_rating sub attribute,
+    value double;
+call_number sub attribute,
+    value long;
+price sub attribute,
+    value double;
+is_vegetarian sub attribute,
+    value boolean;
