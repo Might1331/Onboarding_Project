@@ -1,5 +1,5 @@
 import random
-f = open("Onboarding_Project/data.tql", "w")
+f = open("Onboarding_ProjectTQL/data.tql", "w")
 f.write("insert\n\n\n")
 
 
@@ -28,13 +28,16 @@ print(len(menuPool))
 print(random.randint(0,1))
 menus=[]
 f.write("#menus\n\n")
-for i in range(0,100):
+for i in range(0,50):
     r1=random.Random
-    menu=[placePool[i],menuPool[i],round(random.uniform(1,5),2),random.randint(111222555,999999999),random.randint(0,1)]
+    is_veg="false"
+    if(i%5):
+        is_veg="true"
+    menu=[placePool[i],menuPool[i],round(random.uniform(1,5),2),random.randint(111222555,999999999),is_veg]
     menus.append(menu)
-    w="$m"+str(i)+" isa menu, has place \""+menu[0]+"\", has name \""+menu[1]+"\", has avg_rating "+str(menu[2])+", has call_number "+str(menu[3])+";\n"
+    w="$m"+str(i)+" isa menu, has place \""+menu[0]+"\", has name \""+menu[1]+"\", has avg_rating "+str(menu[2])+", has call_number "+str(menu[3])+", has is_vegetarian "+menu[4]+";\n"
     f.write(w)
-# $m1 isa menu, has place "place237", has name "Golden Arabian", has avg_rating 2.79, has call_number 578404695;
+# $m1 isa menu, has place "place237", has name "Golden Arabian", has avg_rating 2.79, has call_number 578404695, has is_vegetarian false;
 
 for i in range(0,2):
     print(menus[i])    
@@ -42,12 +45,12 @@ for i in range(0,2):
 
 f.write("\n\n#raw_foods\n\n")
 raw_foods=[]
-rawPool=["fish","chicken","mutton","eggs","pwarn","ham","fish","chicken","mutton","eggs","pwarn","ham","cheese","onion","lentis","cabbage","spinach","flour","rice","milk","brocolli","beans","spice","msg","masala","salt","suger","souy sauce","red sauce","tomato sauce","tamarind sauce","beet roots"]
-for i in range(0,2000):
+rawPool=["fish","chicken","mutton","pwarn","cheese","onion","lentis","cabbage","spinach","flour","rice","milk","brocolli","beans","spice","msg","masala","salt","suger","souy sauce","red sauce","tomato sauce","tamarind sauce","beet roots"]
+for i in range(0,500):
     name=""
     is_veg="true"
-    c=i%20
-    if(c<12):
+    c=i%len(rawPool)
+    if(c<4):
         is_veg="false"
     raw_foods.append([rawPool[c]+str(i),is_veg])
     w="$rf"+str(i)+" isa raw_food,has name \""+raw_foods[i][0]+"\",has is_vegetarian "+raw_foods[i][1]+";\n"
@@ -65,29 +68,42 @@ for p in Prefix:
         idx=random.randint(0,len(raw_foods)-1)
         name=p+raw_foods[idx][0]
         is_ingredient={idx}
-        for i in range(0,random.randint(5,20)):
+        is_veg="true"
+        for i in range(0,random.randint(5,10)):
             idx=random.randint(0,len(raw_foods)-1)
+            if(raw_foods[idx][1]=="false"):
+                is_veg="false"
             is_ingredient.add(idx)
         speciality=set()
-        for i in range(0,random.randint(1,10)):
+        ssz=random.randint(0,5)
+        while(len(speciality)<ssz):
             idx=random.randint(0,len(menus)-1)
+            if(menus[idx][4]!=is_veg):
+                continue
             speciality.add(idx)
         sells=dict()
-        for i in range(0,random.randint(0,40)):
+        for v in speciality:
+            sells[v]=round(random.uniform(1,50),2)
+        for i in range(0,random.randint(0,20)):
             idx=random.randint(0,len(menus)-1)
             sells[idx]=round(random.uniform(1,50),2)
-        dishes.append([name,sells,is_ingredient,speciality])
+            if(menus[idx][4]!=is_veg):
+                continue
+        dishes.append([name,sells,is_ingredient,speciality,is_veg])
 random.shuffle(dishes)
 
 f.write("\n\n#dishes\n\n")
 scnt=0
 icnt=0
 spcnt=0
+is_vegmenu=["true"]*50
 for i in range(0,250):
-    w="$d"+str(i)+" isa dish, has name \""+dishes[i][0]+"\";\n"
+    w="$d"+str(i)+" isa dish, has name \""+dishes[i][0]+"\", has is_vegetarian "+dishes[i][4]+";\n"
     f.write(w)
     for p in dishes[i][1]:
         w="$sl"+str(scnt)+" (seller: $m"+str(p)+",product: $d"+str(i)+") isa sells,has price "+str(dishes[i][1][p])+";\n"
+        if(dishes[i][4]=="false"):
+            is_vegmenu[p]="false"
         scnt+=1
         f.write(w)
     for p in dishes[i][2]:
@@ -99,7 +115,7 @@ for i in range(0,250):
         spcnt+=1
         f.write(w)
         
-# $d0 isa dish, has name "Organicmutton1968";
+# $d0 isa dish, has name "Organicmutton1968", has is_vegetarian true;
 # $sl0 (seller: $m0,product: $d0) isa sells,has price 19.51;
 # $is_i0 (dish: $d0,raw_food: $rf0) isa is_ingredient;
 # $sp0 (restaurant: $m0,dish: $d0) isa speciality;
