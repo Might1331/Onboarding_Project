@@ -1,5 +1,5 @@
 # Onboarding_Project
-TypeDB Data Model
+TypeDB restaurant menu data model to deal with food industry dataset easily.
 
 ### Dataset
 The data used here was generated via dataGenerator.py script in the ./src/ directory. To get a new dataset run the script and it will write the data.tql file for you.
