@@ -4,7 +4,7 @@ TypeDB Data Model
 ### Setup
 To get this repository, run the following command inside your git enabled terminal
 ```bash
-$ git clone https://github.com/Might1331/Onboarding_Project.git
+$ git clone https://github.com/Might1331/restaurant-menu-data-model.git
 ```
 
 You will also need typedb server. Download the zip from  https://repo.vaticle.com/#browse/browse:artifact-snapshot:vaticle_typedb%2F07b9dfe04c786888a68f70b6f46dfdad1c9bb2e5%2Ftypedb-server-windows-07b9dfe04c786888a68f70b6f46dfdad1c9bb2e5.zip>.
