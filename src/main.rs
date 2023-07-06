@@ -2,13 +2,13 @@ use typedb_client::{
     concept::{Attribute, Concept, Value},
     Connection, DatabaseManager, Session,
     SessionType::{Data, Schema},
-    TransactionType::{Read, Write},
+    TransactionType::{Read, Write}
 };
 use futures::{StreamExt};
 use  std::fs;
 use text_io::read;
 
-const TEST_DATABASE: &str = "onboarding3";
+const TEST_DATABASE: &str = "menuDB";
  
 fn new_core_connection() -> typedb_client::Result<Connection> {
     Connection::new_plaintext("localhost:1729")
@@ -17,24 +17,17 @@ fn new_core_connection() -> typedb_client::Result<Connection> {
 async fn load_data(connection: Connection)->std::io::Result<()>{
     let data=fs::read_to_string("./src/data.tql")?;    
     let databases = DatabaseManager::new(connection.clone());
-    if databases.contains(TEST_DATABASE).await.unwrap()==false {
-        databases.create(TEST_DATABASE).await.unwrap();    // insert data
-        let session = Session::new(databases.get(TEST_DATABASE).await.unwrap(), Data).await.unwrap();
-        let transaction = session.transaction(Write).await.unwrap();
-        let _ = transaction.query().insert(data.as_str());
-        transaction.commit().await.unwrap();
-        println!("\nData Loaded\n");
-    }else {
-        println!("\nData Already Loaded\n");
-    }
-
-
+    // insert data
+    let session = Session::new(databases.get(TEST_DATABASE).await.unwrap(), Data).await.unwrap();
+    let transaction = session.transaction(Write).await.unwrap();
+    let _ = transaction.query().insert(data.as_str());
+    transaction.commit().await.unwrap();
+    println!("\nData Loaded\n");
     Ok(())
 }
 
 async fn load_schema(connection: Connection)->std::io::Result<()>{
     let schema = fs::read_to_string("./src/schema.tql")?;
-    // query_options(con.clone()).await.unwrap();
     let databases = DatabaseManager::new(connection.clone());
     if databases.contains(TEST_DATABASE).await.unwrap()==false {
         databases.create(TEST_DATABASE).await.unwrap();
@@ -43,6 +36,10 @@ async fn load_schema(connection: Connection)->std::io::Result<()>{
         let transaction = session.transaction(Write).await.unwrap();
         transaction.query().define(schema.as_str()).await.unwrap();
         transaction.commit().await.unwrap();
+        session.force_close().unwrap();
+        
+        // load data for the first
+        load_data(connection.clone()).await?;
         println!("\nSchema Loaded\n");
     }else {
         println!("\nSchema Already Defined\n");
@@ -160,7 +157,6 @@ async fn mymain()->std::io::Result<()>{
 
     let con=new_core_connection().expect("Line: 74");
     load_schema(con.clone()).await?;
-    load_data(con.clone()).await?;
 
     runIO(con.clone()).await;
 
@@ -169,7 +165,5 @@ async fn mymain()->std::io::Result<()>{
 
 #[tokio::main]
 async fn main(){
-    // let r=mymain();
-    // block_on(r);
     mymain().await.unwrap();
 }
