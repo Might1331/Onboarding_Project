@@ -20,57 +20,17 @@
  */
 
 use futures::StreamExt;
-use std::fs;
 use text_io::read;
 use typedb_client::{
     concept::{Attribute, Concept, Value},
     Connection, DatabaseManager, Session,
-    SessionType::{Data, Schema},
-    TransactionType::{Read, Write},
+    SessionType::{Data},
+    TransactionType::{Read},
 };
 mod common;
 
-const MENU_DATABASE: &str = "menuDB";
+const MENU_DATABASE: &str = "menuDB0";
 
-
-async fn load_data(connection: Connection) -> std::io::Result<()> {
-    let data = fs::read_to_string("./src/data.tql")?;
-    let databases = DatabaseManager::new(connection.clone());
-    // insert data
-    let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
-        .await
-        .unwrap();
-    let transaction = session.transaction(Write).await.unwrap();
-    let _ = transaction.query().insert(data.as_str());
-    transaction.commit().await.unwrap();
-    println!("\nData Loaded\n");
-    Ok(())
-}
-
-async fn load_schema(connection: Connection) -> std::io::Result<()> {
-    let schema = fs::read_to_string("./src/schema.tql")?;
-    let databases = DatabaseManager::new(connection.clone());
-    if !databases.contains(MENU_DATABASE).await.unwrap() {
-        databases.create(MENU_DATABASE).await.unwrap();
-        // define schema
-        {
-            let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Schema)
-                .await
-                .unwrap();
-            let transaction = session.transaction(Write).await.unwrap();
-            transaction.query().define(schema.as_str()).await.unwrap();
-            transaction.commit().await.unwrap();
-        }
-
-        // load data for the first
-        load_data(connection.clone()).await?;
-        println!("\nSchema Loaded\n");
-    } else {
-        println!("\nSchema Already Defined\n");
-    }
-
-    Ok(())
-}
 
 async fn query1(connection: Connection) -> std::io::Result<()> {
     let databases = DatabaseManager::new(connection.clone());
@@ -197,11 +157,15 @@ async fn query_runner(connection: Connection) {
 
 #[tokio::main]
 async fn main() {
+    let current_line = line!().to_string();
+    let connection = common::new_core_connection().expect(&current_line);        
+    let databases = DatabaseManager::new(connection.clone());
+    if !databases.contains(MENU_DATABASE).await.unwrap() {
+        databases.create(MENU_DATABASE).await.unwrap();
+        common::load_schema(connection.clone(),MENU_DATABASE).await.unwrap();
+        common::load_data(connection.clone(),MENU_DATABASE).await.unwrap();
+    }
     loop {
-        let current_line = line!().to_string();
-        let connection = common::new_core_connection().expect(&current_line);
-        load_schema(connection.clone()).await.unwrap();
-
         query_runner(connection.clone()).await;
         println!("Enter 0 to exit or 1 to continue:");
         let query_again: i32 = read!();
