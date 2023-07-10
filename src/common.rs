@@ -29,7 +29,7 @@
  pub const TEST_DATABASE: &str = "test";
  
  pub fn new_core_connection() -> typedb_client::Result<Connection> {
-     Connection::new_plaintext("0.0.0.0:1729")
+     Connection::new_plaintext("localhost:1729")
  }
  
  pub fn new_cluster_connection() -> typedb_client::Result<Connection> {
@@ -58,10 +58,6 @@
      let transaction = session.transaction(Write).await?;
      transaction.query().define(schema).await?;
      transaction.commit().await?;
-
-     let transaction = session.transaction(Read).await?;
-     let age_count = transaction.query().match_aggregate("match $x isa age; count;").await?;
-     assert_eq!(age_count.into_i64(), 0);
      Ok(())
  }
  

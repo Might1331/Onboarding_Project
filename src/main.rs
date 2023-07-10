@@ -28,12 +28,10 @@ use typedb_client::{
     SessionType::{Data, Schema},
     TransactionType::{Read, Write},
 };
+mod common;
 
 const MENU_DATABASE: &str = "menuDB";
 
-fn new_core_connection() -> typedb_client::Result<Connection> {
-    Connection::new_plaintext("localhost:1729")
-}
 
 async fn load_data(connection: Connection) -> std::io::Result<()> {
     let data = fs::read_to_string("./src/data.tql")?;
@@ -74,12 +72,17 @@ async fn load_schema(connection: Connection) -> std::io::Result<()> {
     Ok(())
 }
 
-async fn query1(connection: Connection, x: String) -> std::io::Result<()> {
+async fn query1(connection: Connection) -> std::io::Result<()> {
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
         .await
         .unwrap();
     let transaction = session.transaction(Read).await.unwrap();
+
+    println!("Enter the name of raw_food x : ");
+    let inp: String = read!();
+    let x = inp.as_str();
+
     println!("::Q1::");
     let q = format!(
         "match $rf isa raw_food, has name \"{x}\";
@@ -115,8 +118,9 @@ async fn query2(connection: Connection) -> std::io::Result<()> {
     let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
         .await
         .unwrap();
-    println!("::Q2::");
     let transaction = session.transaction(Read).await.unwrap();
+
+    println!("::Q2::");
     let q = "
     match $m2 isa menu, has is_vegetarian false,has name $n2;
     $d2 isa dish, has is_vegetarian false;
@@ -131,12 +135,20 @@ async fn query2(connection: Connection) -> std::io::Result<()> {
     Ok(())
 }
 
-async fn query3(connection: Connection, r: String, p: String) -> std::io::Result<()> {
+async fn query3(connection: Connection) -> std::io::Result<()> {
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
         .await
         .unwrap();
     let transaction = session.transaction(Read).await.unwrap();
+
+    println!("Enter the avg_rating of Restraunt r : ");
+    let inp0: String = read!();
+    let r = inp0.as_str();
+    println!("Enter the threshold price for raw_ingredient p : ");
+    let inp1: String = read!();
+    let p = inp1.as_str();
+
     println!("::Q3::");
     let q = format!(
         "match $m3 isa menu, has avg_rating>{r},has name $mn3;
@@ -169,44 +181,28 @@ async fn query3(connection: Connection, r: String, p: String) -> std::io::Result
     Ok(())
 }
 
-async fn run_io(connection: Connection) {
+async fn query_runner(connection: Connection) {
     println!("Q1->What places could buy raw_food=$x ?");
     println!("Q2->Get count of non-vegetarian outlets with vegetarian specialities.");
     println!("Q3->Get count raw items sold at places with avg_rating more tha $r and has a dish using it as raw_ingredient with price greater than $p units.");
     println!("What query would you like to make? Enter 1,2 or 3.\n");
     let qtype: i32 = read!();
-    if qtype == 1 {
-        println!("Enter the name of raw_food x : ");
-        let inp: String = read!();
-        let x = inp.as_str();
-
-        query1(connection, x.to_string()).await.unwrap();
-    } else if qtype == 2 {
-        query2(connection).await.unwrap();
-    } else if qtype == 3 {
-        println!("Enter the avg_rating of Restraunt r : ");
-        let inp0: String = read!();
-        let r = inp0.as_str();
-        println!("Enter the threshold price for raw_ingredient p : ");
-        let inp1: String = read!();
-        let p = inp1.as_str();
-
-        query3(connection, r.to_string(), p.to_string())
-            .await
-            .unwrap();
-    } else {
-        println!("Query entered is not 1,2 or 3\n");
-    }
+    match qtype {
+        1 => query1(connection).await.unwrap(),
+        2 => query2(connection).await.unwrap(),
+        3 => query3(connection).await.unwrap(),
+        _ => println!("Query entered is not 1,2 or 3\n"),
+    };
 }
 
 #[tokio::main]
 async fn main() {
     loop {
         let current_line = line!().to_string();
-        let con = new_core_connection().expect(&current_line);
-        load_schema(con.clone()).await.unwrap();
+        let connection = common::new_core_connection().expect(&current_line);
+        load_schema(connection.clone()).await.unwrap();
 
-        run_io(con.clone()).await;
+        query_runner(connection.clone()).await;
         println!("Enter 0 to exit or 1 to continue:");
         let query_again: i32 = read!();
         if query_again == 0 {
