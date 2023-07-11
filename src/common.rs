@@ -22,14 +22,14 @@ use std::fs;
 use typedb_client::{
     Connection, DatabaseManager, Session,
     SessionType::{Data, Schema},
-    TransactionType::{Write},
+    TransactionType::Write,
 };
 
 pub fn new_core_connection() -> typedb_client::Result<Connection> {
     Connection::new_plaintext("localhost:1729")
 }
 
-pub async fn load_schema(connection: Connection,database_name: &str) -> std::io::Result<()> {
+pub async fn load_schema(connection: Connection, database_name: &str) -> std::io::Result<()> {
     let schema = fs::read_to_string("./src/schema.tql")?;
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(database_name).await.unwrap(), Schema)
@@ -42,14 +42,14 @@ pub async fn load_schema(connection: Connection,database_name: &str) -> std::io:
     Ok(())
 }
 
-pub async fn load_data(connection: Connection,database_name: &str) -> std::io::Result<()> {
+pub async fn load_data(connection: Connection, database_name: &str) -> std::io::Result<()> {
     let data = fs::read_to_string("./src/data.tql")?;
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(database_name).await.unwrap(), Data)
         .await
         .unwrap();
     let transaction = session.transaction(Write).await.unwrap();
-    let _ = transaction.query().insert(data.as_str());
+    transaction.query().insert(data.as_str()).unwrap();
     transaction.commit().await.unwrap();
     println!("\nData Loaded\n");
     Ok(())

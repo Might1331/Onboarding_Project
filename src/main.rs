@@ -24,15 +24,14 @@ use text_io::read;
 use typedb_client::{
     concept::{Attribute, Concept, Value},
     Connection, DatabaseManager, Session,
-    SessionType::{Data},
-    TransactionType::{Read},
+    SessionType::Data,
+    TransactionType::Read,
 };
 mod common;
 
-const MENU_DATABASE: &str = "menuDB0";
+const MENU_DATABASE: &str = "menuDB";
 
-
-async fn query1(connection: Connection) -> std::io::Result<()> {
+async fn get_sellers(connection: Connection) -> std::io::Result<()> {
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
         .await
@@ -73,7 +72,7 @@ async fn query1(connection: Connection) -> std::io::Result<()> {
     Ok(())
 }
 
-async fn query2(connection: Connection) -> std::io::Result<()> {
+async fn get_strange_menu(connection: Connection) -> std::io::Result<()> {
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
         .await
@@ -85,7 +84,8 @@ async fn query2(connection: Connection) -> std::io::Result<()> {
     match $m2 isa menu, has is_vegetarian false,has name $n2;
     $d2 isa dish, has is_vegetarian false;
     $sp2 (restaurant: $m2,$d2) isa speciality;
-    get $m2;count;".to_string();
+    get $m2;count;"
+        .to_string();
     let answer = transaction
         .query()
         .match_aggregate(q.as_str())
@@ -95,7 +95,7 @@ async fn query2(connection: Connection) -> std::io::Result<()> {
     Ok(())
 }
 
-async fn query3(connection: Connection) -> std::io::Result<()> {
+async fn get_raw_items(connection: Connection) -> std::io::Result<()> {
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
         .await
@@ -148,22 +148,25 @@ async fn query_runner(connection: Connection) {
     println!("What query would you like to make? Enter 1,2 or 3.\n");
     let qtype: i32 = read!();
     match qtype {
-        1 => query1(connection).await.unwrap(),
-        2 => query2(connection).await.unwrap(),
-        3 => query3(connection).await.unwrap(),
+        1 => get_sellers(connection).await.unwrap(),
+        2 => get_strange_menu(connection).await.unwrap(),
+        3 => get_raw_items(connection).await.unwrap(),
         _ => println!("Query entered is not 1,2 or 3\n"),
     };
 }
 
 #[tokio::main]
 async fn main() {
-    let current_line = line!().to_string();
-    let connection = common::new_core_connection().expect(&current_line);        
+    let connection = common::new_core_connection().expect(&line!().to_string());
     let databases = DatabaseManager::new(connection.clone());
     if !databases.contains(MENU_DATABASE).await.unwrap() {
         databases.create(MENU_DATABASE).await.unwrap();
-        common::load_schema(connection.clone(),MENU_DATABASE).await.unwrap();
-        common::load_data(connection.clone(),MENU_DATABASE).await.unwrap();
+        common::load_schema(connection.clone(), MENU_DATABASE)
+            .await
+            .unwrap();
+        common::load_data(connection.clone(), MENU_DATABASE)
+            .await
+            .unwrap();
     }
     loop {
         query_runner(connection.clone()).await;
