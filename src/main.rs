@@ -20,7 +20,7 @@
  */
 
 use futures::StreamExt;
-use text_io::read;
+use std::io;
 use typedb_client::{
     concept::{Attribute, Concept, Value},
     Connection, DatabaseManager, Session,
@@ -29,28 +29,37 @@ use typedb_client::{
 };
 mod common;
 
-const MENU_DATABASE: &str = "menuDB";
+#[derive(Debug)]
+enum HandleError {
+    Io(io::Error),
+    TypeDB(typedb_client::error::Error),
+}
 
-async fn get_sellers(connection: Connection) -> std::io::Result<()> {
+const MENU_DATABASE: &str = "menuDB1";
+fn read_input() -> Result<String, HandleError>{
+    let mut input_string = String::new();
+    io::stdin().read_line(&mut input_string).map_err(HandleError::Io)?;
+    Ok(input_string.trim().to_string())
+}
+
+
+async fn get_sellers(connection: Connection) -> Result<(), HandleError>{
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
+    let session = Session::new(databases.get(MENU_DATABASE).await.map_err(HandleError::TypeDB)?, Data)
         .await
-        .unwrap();
-    let transaction = session.transaction(Read).await.unwrap();
+        .map_err(HandleError::TypeDB)?;
+    let transaction = session.transaction(Read).await.map_err(HandleError::TypeDB)?;
 
     println!("Enter the name of raw_food x : ");
-    let inp: String = read!();
-    let x = inp.as_str();
-
-    println!("::Q1::");
+    let x: String = read_input()?;
     let q = format!(
         "match $rf isa raw_food, has name \"{x}\";
         $is_i (raw_food: $rf,dish: $d) isa is_ingredient;
         $sl (seller: $m,product: $d) isa sells;
-        $m has name $n,has call_number $c;
+        $m has name $n;
         get $n;"
     );
-    let mut answer_stream = transaction.query().match_(q.as_str()).unwrap();
+    let mut answer_stream = transaction.query().match_(q.as_str()).map_err(HandleError::TypeDB)?;
     while let Some(result) = answer_stream.next().await {
         match result {
             Ok(concept_map) => {
@@ -65,61 +74,59 @@ async fn get_sellers(connection: Connection) -> std::io::Result<()> {
                 }
             }
             Err(err) => {
-                panic!("An error occurred fetching answers of a Match query: {err}")
+                return Err(HandleError::TypeDB(err));
             }
         }
     }
     Ok(())
 }
 
-async fn get_strange_menu(connection: Connection) -> std::io::Result<()> {
+async fn get_strange_menu(connection: Connection) -> Result<(), HandleError> {
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
+    let session = Session::new(databases.get(MENU_DATABASE).await.map_err(HandleError::TypeDB)?, Data)
         .await
         .unwrap();
-    let transaction = session.transaction(Read).await.unwrap();
+    let transaction = session.transaction(Read).await.map_err(HandleError::TypeDB)?;
 
     println!("::Q2::");
     let q = "
-    match $m2 isa menu, has is_vegetarian false,has name $n2;
-    $d2 isa dish, has is_vegetarian false;
-    $sp2 (restaurant: $m2,$d2) isa speciality;
-    get $m2;count;"
+    match $m isa menu, has is_vegetarian false,has name $n;
+    $d isa dish, has is_vegetarian false;
+    $sp (restaurant: $m,$d) isa speciality;
+    get $m;count;"
         .to_string();
     let answer = transaction
         .query()
         .match_aggregate(q.as_str())
         .await
-        .unwrap();
+        .map_err(HandleError::TypeDB)?;
     println!("Answe for Q2:  {}\n", answer.into_i64());
     Ok(())
 }
 
-async fn get_raw_items(connection: Connection) -> std::io::Result<()> {
+async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(MENU_DATABASE).await.unwrap(), Data)
+    let session = Session::new(databases.get(MENU_DATABASE).await.map_err(HandleError::TypeDB)?, Data)
         .await
         .unwrap();
-    let transaction = session.transaction(Read).await.unwrap();
+    let transaction = session.transaction(Read).await.map_err(HandleError::TypeDB)?;
 
     println!("Enter the avg_rating of Restraunt r : ");
-    let inp0: String = read!();
-    let r = inp0.as_str();
+    let avg_rating: String = read_input()?;
     println!("Enter the threshold price for raw_ingredient p : ");
-    let inp1: String = read!();
-    let p = inp1.as_str();
+    let price: String = read_input()?;
 
     println!("::Q3::");
     let q = format!(
-        "match $m3 isa menu, has avg_rating>{r},has name $mn3;
-        $d3 isa dish, has name $dn3;
-        $sl3 (seller: $m3,product: $d3) isa sells, has price $p3;
-        $p3>{p};
-        $rf3 isa raw_food,has name $rfn3;
-        $isn3 (raw_food: $rf3,$d3) isa is_ingredient;
-        get $rfn3;"
+        "match $m isa menu, has avg_rating>{avg_rating},has name $mn;
+        $d isa dish, has name $dn;
+        $sl (seller: $m,product: $d) isa sells, has price $p;
+        $p>{price};
+        $rf isa raw_food,has name $rfn;
+        $isn (raw_food: $rf,$d) isa is_ingredient;
+        get $rfn;"
     );
-    let mut answer_stream = transaction.query().match_(q.as_str()).unwrap();
+    let mut answer_stream = transaction.query().match_(q.as_str()).map_err(HandleError::TypeDB)?;
     while let Some(result) = answer_stream.next().await {
         match result {
             Ok(concept_map) => {
@@ -133,47 +140,49 @@ async fn get_raw_items(connection: Connection) -> std::io::Result<()> {
                     }
                 }
             }
-            Err(err) => {
-                panic!("An error occurred fetching answers of a Match query: {err}")
+            Err(err) =>{
+                return Err(HandleError::TypeDB(err));
             }
         }
     }
     Ok(())
 }
 
-async fn query_runner(connection: Connection) {
+async fn query_runner(connection: Connection)->Result<(),HandleError>{
     println!("Q1->What places could buy raw_food=$x ?");
     println!("Q2->Get count of non-vegetarian outlets with vegetarian specialities.");
     println!("Q3->Get count raw items sold at places with avg_rating more tha $r and has a dish using it as raw_ingredient with price greater than $p units.");
     println!("What query would you like to make? Enter 1,2 or 3.\n");
-    let qtype: i32 = read!();
-    match qtype {
-        1 => get_sellers(connection).await.unwrap(),
-        2 => get_strange_menu(connection).await.unwrap(),
-        3 => get_raw_items(connection).await.unwrap(),
+    let qtype = read_input()?;
+    match qtype.as_str() {
+        "1" => get_sellers(connection).await?,
+        "2" => get_strange_menu(connection).await?,
+        "3" => get_raw_items(connection).await?,
         _ => println!("Query entered is not 1,2 or 3\n"),
     };
+    Ok(())
 }
 
 #[tokio::main]
-async fn main() {
+async fn main()->Result<(), HandleError> {
     let connection = common::new_core_connection().expect(&line!().to_string());
     let databases = DatabaseManager::new(connection.clone());
-    if !databases.contains(MENU_DATABASE).await.unwrap() {
-        databases.create(MENU_DATABASE).await.unwrap();
-        common::load_schema(connection.clone(), MENU_DATABASE)
+    if !databases.contains(MENU_DATABASE).await.map_err(HandleError::TypeDB)? {
+        databases.create(MENU_DATABASE).await.map_err(HandleError::TypeDB)?;
+        common::load_schema(connection.clone(), MENU_DATABASE,"./src/schema.tql")
+            .await.expect("load_schema function failed");
+        common::load_data(connection.clone(), MENU_DATABASE,"./src/data.tql")
             .await
-            .unwrap();
-        common::load_data(connection.clone(), MENU_DATABASE)
-            .await
-            .unwrap();
+            .expect("load_data function failed");
     }
+
     loop {
-        query_runner(connection.clone()).await;
+        query_runner(connection.clone()).await?;
         println!("Enter 0 to exit or 1 to continue:");
-        let query_again: i32 = read!();
-        if query_again == 0 {
+        let query_again = read_input()?;
+        if query_again == "0" {
             break;
         }
     }
+    Ok(())
 }
