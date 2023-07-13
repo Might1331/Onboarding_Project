@@ -18,14 +18,13 @@
 * specific language governing permissions and limitations
 * under the License.
 */
-use std::{fs,io};
 use futures::TryStreamExt;
+use std::{fs, io};
 use typedb_client::{
     Connection, DatabaseManager, Session,
     SessionType::{Data, Schema},
     TransactionType::Write,
 };
-
 
 #[derive(Debug)]
 pub enum HandleError {
@@ -37,27 +36,57 @@ pub fn new_core_connection() -> typedb_client::Result<Connection> {
     Connection::new_plaintext("localhost:1729")
 }
 
-pub async fn load_schema(connection: Connection, database_name: &str,tql_file_path: &str) -> Result<(), HandleError> {
+pub async fn load_schema(
+    connection: Connection,
+    database_name: &str,
+    tql_file_path: &str,
+) -> Result<(), HandleError> {
     let schema = fs::read_to_string(tql_file_path).map_err(HandleError::Io)?;
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(database_name).await.map_err(HandleError::TypeDB)?, Schema)
+    let session = Session::new(
+        databases
+            .get(database_name)
+            .await
+            .map_err(HandleError::TypeDB)?,
+        Schema,
+    )
+    .await
+    .map_err(HandleError::TypeDB)?;
+    let transaction = session
+        .transaction(Write)
         .await
         .map_err(HandleError::TypeDB)?;
-    let transaction = session.transaction(Write).await.map_err(HandleError::TypeDB)?;
-    transaction.query().define(schema.as_str()).await.map_err(HandleError::TypeDB)?;
+    transaction
+        .query()
+        .define(schema.as_str())
+        .await
+        .map_err(HandleError::TypeDB)?;
     transaction.commit().await.map_err(HandleError::TypeDB)?;
     drop(session);
     println!("\nSchema Defined Successfully\n");
     Ok(())
 }
 
-pub async fn load_data(connection: Connection, database_name: &str,tql_file_path: &str) ->Result<(), HandleError> {
+pub async fn load_data(
+    connection: Connection,
+    database_name: &str,
+    tql_file_path: &str,
+) -> Result<(), HandleError> {
     let data = fs::read_to_string(tql_file_path).map_err(HandleError::Io)?;
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(database_name).await.map_err(HandleError::TypeDB)?, Data)
+    let session = Session::new(
+        databases
+            .get(database_name)
+            .await
+            .map_err(HandleError::TypeDB)?,
+        Data,
+    )
+    .await
+    .map_err(HandleError::TypeDB)?;
+    let transaction = session
+        .transaction(Write)
         .await
         .map_err(HandleError::TypeDB)?;
-    let transaction = session.transaction(Write).await.map_err(HandleError::TypeDB)?;
     let inserted_query = transaction.query().insert(data.as_str());
     let _ = inserted_query.unwrap().try_collect::<Vec<_>>().await;
     transaction.commit().await.map_err(HandleError::TypeDB)?;

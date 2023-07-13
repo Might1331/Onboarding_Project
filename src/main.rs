@@ -36,19 +36,29 @@ enum HandleError {
 }
 
 const MENU_DATABASE: &str = "menuDB1";
-fn read_input() -> Result<String, HandleError>{
+fn read_input() -> Result<String, HandleError> {
     let mut input_string = String::new();
-    io::stdin().read_line(&mut input_string).map_err(HandleError::Io)?;
+    io::stdin()
+        .read_line(&mut input_string)
+        .map_err(HandleError::Io)?;
     Ok(input_string.trim().to_string())
 }
 
-
-async fn get_sellers(connection: Connection) -> Result<(), HandleError>{
+async fn get_sellers(connection: Connection) -> Result<(), HandleError> {
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(MENU_DATABASE).await.map_err(HandleError::TypeDB)?, Data)
+    let session = Session::new(
+        databases
+            .get(MENU_DATABASE)
+            .await
+            .map_err(HandleError::TypeDB)?,
+        Data,
+    )
+    .await
+    .map_err(HandleError::TypeDB)?;
+    let transaction = session
+        .transaction(Read)
         .await
         .map_err(HandleError::TypeDB)?;
-    let transaction = session.transaction(Read).await.map_err(HandleError::TypeDB)?;
 
     println!("Enter the name of raw_food x : ");
     let x: String = read_input()?;
@@ -59,7 +69,10 @@ async fn get_sellers(connection: Connection) -> Result<(), HandleError>{
         $m has name $n;
         get $n;"
     );
-    let mut answer_stream = transaction.query().match_(q.as_str()).map_err(HandleError::TypeDB)?;
+    let mut answer_stream = transaction
+        .query()
+        .match_(q.as_str())
+        .map_err(HandleError::TypeDB)?;
     while let Some(result) = answer_stream.next().await {
         match result {
             Ok(concept_map) => {
@@ -83,10 +96,19 @@ async fn get_sellers(connection: Connection) -> Result<(), HandleError>{
 
 async fn get_strange_menu(connection: Connection) -> Result<(), HandleError> {
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(MENU_DATABASE).await.map_err(HandleError::TypeDB)?, Data)
+    let session = Session::new(
+        databases
+            .get(MENU_DATABASE)
+            .await
+            .map_err(HandleError::TypeDB)?,
+        Data,
+    )
+    .await
+    .unwrap();
+    let transaction = session
+        .transaction(Read)
         .await
-        .unwrap();
-    let transaction = session.transaction(Read).await.map_err(HandleError::TypeDB)?;
+        .map_err(HandleError::TypeDB)?;
 
     println!("::Q2::");
     let q = "
@@ -106,10 +128,19 @@ async fn get_strange_menu(connection: Connection) -> Result<(), HandleError> {
 
 async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(MENU_DATABASE).await.map_err(HandleError::TypeDB)?, Data)
+    let session = Session::new(
+        databases
+            .get(MENU_DATABASE)
+            .await
+            .map_err(HandleError::TypeDB)?,
+        Data,
+    )
+    .await
+    .unwrap();
+    let transaction = session
+        .transaction(Read)
         .await
-        .unwrap();
-    let transaction = session.transaction(Read).await.map_err(HandleError::TypeDB)?;
+        .map_err(HandleError::TypeDB)?;
 
     println!("Enter the avg_rating of Restraunt r : ");
     let avg_rating: String = read_input()?;
@@ -126,7 +157,10 @@ async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
         $isn (raw_food: $rf,$d) isa is_ingredient;
         get $rfn;"
     );
-    let mut answer_stream = transaction.query().match_(q.as_str()).map_err(HandleError::TypeDB)?;
+    let mut answer_stream = transaction
+        .query()
+        .match_(q.as_str())
+        .map_err(HandleError::TypeDB)?;
     while let Some(result) = answer_stream.next().await {
         match result {
             Ok(concept_map) => {
@@ -140,7 +174,7 @@ async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
                     }
                 }
             }
-            Err(err) =>{
+            Err(err) => {
                 return Err(HandleError::TypeDB(err));
             }
         }
@@ -148,7 +182,7 @@ async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
     Ok(())
 }
 
-async fn query_runner(connection: Connection)->Result<(),HandleError>{
+async fn query_runner(connection: Connection) -> Result<(), HandleError> {
     println!("Q1->What places could buy raw_food=$x ?");
     println!("Q2->Get count of non-vegetarian outlets with vegetarian specialities.");
     println!("Q3->Get count raw items sold at places with avg_rating more tha $r and has a dish using it as raw_ingredient with price greater than $p units.");
@@ -164,14 +198,22 @@ async fn query_runner(connection: Connection)->Result<(),HandleError>{
 }
 
 #[tokio::main]
-async fn main()->Result<(), HandleError> {
+async fn main() -> Result<(), HandleError> {
     let connection = common::new_core_connection().expect(&line!().to_string());
     let databases = DatabaseManager::new(connection.clone());
-    if !databases.contains(MENU_DATABASE).await.map_err(HandleError::TypeDB)? {
-        databases.create(MENU_DATABASE).await.map_err(HandleError::TypeDB)?;
-        common::load_schema(connection.clone(), MENU_DATABASE,"./src/schema.tql")
-            .await.expect("load_schema function failed");
-        common::load_data(connection.clone(), MENU_DATABASE,"./src/data.tql")
+    if !databases
+        .contains(MENU_DATABASE)
+        .await
+        .map_err(HandleError::TypeDB)?
+    {
+        databases
+            .create(MENU_DATABASE)
+            .await
+            .map_err(HandleError::TypeDB)?;
+        common::load_schema(connection.clone(), MENU_DATABASE, "./src/schema.tql")
+            .await
+            .expect("load_schema function failed");
+        common::load_data(connection.clone(), MENU_DATABASE, "./src/data.tql")
             .await
             .expect("load_data function failed");
     }
