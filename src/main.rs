@@ -22,10 +22,7 @@
 use futures::StreamExt;
 use std::io;
 use typedb_client::{
-    concept::{Attribute, Concept, Value},
-    Connection, DatabaseManager, Session,
-    SessionType::Data,
-    TransactionType::Read,
+    Connection, DatabaseManager, Session, SessionType::Data, TransactionType::Read,
 };
 mod common;
 
@@ -36,17 +33,10 @@ enum HandleError {
 }
 
 const MENU_DATABASE: &str = "menuDB1";
-fn read_input() -> Result<String, HandleError> {
-    let mut input_string = String::new();
-    io::stdin()
-        .read_line(&mut input_string)
-        .map_err(HandleError::Io)?;
-    Ok(input_string.trim().to_string())
-}
 
 async fn get_sellers(connection: Connection) -> Result<(), HandleError> {
-    let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(
+    let databases: DatabaseManager = DatabaseManager::new(connection.clone());
+    let session: Session = Session::new(
         databases
             .get(MENU_DATABASE)
             .await
@@ -61,8 +51,8 @@ async fn get_sellers(connection: Connection) -> Result<(), HandleError> {
         .map_err(HandleError::TypeDB)?;
 
     println!("Enter the name of raw_food x : ");
-    let x: String = read_input()?;
-    let q = format!(
+    let x: String = common::read_input().unwrap();
+    let q: String = format!(
         "match $rf isa raw_food, has name \"{x}\";
         $is_i (raw_food: $rf,dish: $d) isa is_ingredient;
         $sl (seller: $m,product: $d) isa sells;
@@ -74,22 +64,7 @@ async fn get_sellers(connection: Connection) -> Result<(), HandleError> {
         .match_(q.as_str())
         .map_err(HandleError::TypeDB)?;
     while let Some(result) = answer_stream.next().await {
-        match result {
-            Ok(concept_map) => {
-                for (_, concept) in concept_map {
-                    if let Concept::Attribute(Attribute {
-                        value: Value::String(value),
-                        ..
-                    }) = concept
-                    {
-                        println!("{}", value);
-                    }
-                }
-            }
-            Err(err) => {
-                return Err(HandleError::TypeDB(err));
-            }
-        }
+        common::print_concept_map(result).map_err(HandleError::TypeDB)?;
     }
     Ok(())
 }
@@ -111,24 +86,24 @@ async fn get_strange_menu(connection: Connection) -> Result<(), HandleError> {
         .map_err(HandleError::TypeDB)?;
 
     println!("::Q2::");
-    let q = "
+    let q: String = "
     match $m isa menu, has is_vegetarian false,has name $n;
-    $d isa dish, has is_vegetarian false;
+    $d isa dish, has is_vegetarian true;
     $sp (restaurant: $m,$d) isa speciality;
     get $m;count;"
         .to_string();
-    let answer = transaction
+    let answer: typedb_client::answer::Numeric = transaction
         .query()
         .match_aggregate(q.as_str())
         .await
         .map_err(HandleError::TypeDB)?;
-    println!("Answe for Q2:  {}\n", answer.into_i64());
+    println!("Answer for Q2:  {}\n", answer.into_i64());
     Ok(())
 }
 
 async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
-    let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(
+    let databases: DatabaseManager = DatabaseManager::new(connection.clone());
+    let session: Session = Session::new(
         databases
             .get(MENU_DATABASE)
             .await
@@ -137,18 +112,18 @@ async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
     )
     .await
     .unwrap();
-    let transaction = session
+    let transaction: typedb_client::Transaction<'_> = session
         .transaction(Read)
         .await
         .map_err(HandleError::TypeDB)?;
 
     println!("Enter the avg_rating of Restraunt r : ");
-    let avg_rating: String = read_input()?;
+    let avg_rating: String = common::read_input().unwrap();
     println!("Enter the threshold price for raw_ingredient p : ");
-    let price: String = read_input()?;
+    let price: String = common::read_input().unwrap();
 
     println!("::Q3::");
-    let q = format!(
+    let q: String = format!(
         "match $m isa menu, has avg_rating>{avg_rating},has name $mn;
         $d isa dish, has name $dn;
         $sl (seller: $m,product: $d) isa sells, has price $p;
@@ -162,22 +137,7 @@ async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
         .match_(q.as_str())
         .map_err(HandleError::TypeDB)?;
     while let Some(result) = answer_stream.next().await {
-        match result {
-            Ok(concept_map) => {
-                for (_, concept) in concept_map {
-                    if let Concept::Attribute(Attribute {
-                        value: Value::String(value),
-                        ..
-                    }) = concept
-                    {
-                        println!("{}", value);
-                    }
-                }
-            }
-            Err(err) => {
-                return Err(HandleError::TypeDB(err));
-            }
-        }
+        common::print_concept_map(result).map_err(HandleError::TypeDB)?;
     }
     Ok(())
 }
@@ -185,9 +145,9 @@ async fn get_raw_items(connection: Connection) -> Result<(), HandleError> {
 async fn query_runner(connection: Connection) -> Result<(), HandleError> {
     println!("Q1->What places could buy raw_food=$x ?");
     println!("Q2->Get count of non-vegetarian outlets with vegetarian specialities.");
-    println!("Q3->Get count raw items sold at places with avg_rating more tha $r and has a dish using it as raw_ingredient with price greater than $p units.");
+    println!("Q3->Get raw items sold at places with avg_rating more tha $r and has a dish using it as raw_ingredient with price greater than $p units.");
     println!("What query would you like to make? Enter 1,2 or 3.\n");
-    let qtype = read_input()?;
+    let qtype: String = common::read_input().unwrap();
     match qtype.as_str() {
         "1" => get_sellers(connection).await?,
         "2" => get_strange_menu(connection).await?,
@@ -199,8 +159,8 @@ async fn query_runner(connection: Connection) -> Result<(), HandleError> {
 
 #[tokio::main]
 async fn main() -> Result<(), HandleError> {
-    let connection = common::new_core_connection().expect(&line!().to_string());
-    let databases = DatabaseManager::new(connection.clone());
+    let connection: Connection = common::new_core_connection().expect(&line!().to_string());
+    let databases: DatabaseManager = DatabaseManager::new(connection.clone());
     if !databases
         .contains(MENU_DATABASE)
         .await
@@ -221,7 +181,7 @@ async fn main() -> Result<(), HandleError> {
     loop {
         query_runner(connection.clone()).await?;
         println!("Enter 0 to exit or 1 to continue:");
-        let query_again = read_input()?;
+        let query_again = common::read_input().map_err(HandleError::Io)?;
         if query_again == "0" {
             break;
         }
