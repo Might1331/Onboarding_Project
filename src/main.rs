@@ -113,7 +113,7 @@ async fn get_strange_menu(connection: Connection) -> Result<(), HandleError> {
     println!("::Q2::");
     let q = "
     match $m isa menu, has is_vegetarian false,has name $n;
-    $d isa dish, has is_vegetarian false;
+    $d isa dish, has is_vegetarian true;
     $sp (restaurant: $m,$d) isa speciality;
     get $m;count;"
         .to_string();
