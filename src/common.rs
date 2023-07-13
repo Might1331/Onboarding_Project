@@ -63,7 +63,7 @@ pub async fn load_data(
     let databases = DatabaseManager::new(connection.clone());
     let session = Session::new(databases.get(database_name).await?, Data).await?;
     let transaction = session.transaction(Write).await?;
-    transaction.query().insert(data.as_str())?;
+    transaction.query().insert(data.as_str()).ok();
     transaction.commit().await?;
     println!("\nData Loaded Successfully\n");
     Ok(())
